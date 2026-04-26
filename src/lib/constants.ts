@@ -10,12 +10,12 @@ export const COLUMNS: { key: ColumnKey; label: string; accent: string }[] = [
 ];
 
 export const ASSIGNEES = [
-  "Jordan Barney",
+  "Jordan",
   "Dasha",
-  "Ceno Pant",
-  "François Rousseau",
-  "Brent Barnhart",
-  "Tony Cohn",
+  "Ceno",
+  "François",
+  "Brent",
+  "Tony",
 ];
 
 // Work-type + issue tags. Mapped to the kickoff call:
