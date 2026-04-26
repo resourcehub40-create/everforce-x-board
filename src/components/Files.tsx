@@ -3,10 +3,17 @@ import { supabase } from "../lib/supabase";
 import { STORAGE_BUCKET } from "../lib/constants";
 
 interface FileItem {
-  name: string;
+  name: string;        // storage key (with timestamp prefix)
+  displayName: string; // human name for UI + download
   size: number;
   uploadedAt: string;
   url: string;
+}
+
+function cleanName(storageName: string): string {
+  // Strip leading "1234567890_" timestamp prefix and convert _ back to spaces.
+  const stripped = storageName.replace(/^\d{8,}_/, "");
+  return stripped.replace(/_/g, " ");
 }
 
 function fmtSize(b: number) {
@@ -31,6 +38,7 @@ export default function Files({ email }: { email: string }) {
       .filter((f) => f.name && !f.name.startsWith("."))
       .map((f) => ({
         name: f.name,
+        displayName: cleanName(f.name),
         size: (f.metadata as { size?: number } | null)?.size ?? 0,
         uploadedAt: f.created_at ?? "",
         url: supabase.storage.from(STORAGE_BUCKET).getPublicUrl(f.name).data.publicUrl,
@@ -89,12 +97,12 @@ export default function Files({ email }: { email: string }) {
           {items.map((f) => (
             <div key={f.name} className="flex items-center gap-3 py-2">
               <div className="flex-1 min-w-0">
-                <div className="text-sm text-ef-text truncate">{f.name}</div>
+                <div className="text-sm text-ef-text truncate">{f.displayName}</div>
                 <div className="text-[11px] text-ef-mute">
                   {fmtSize(f.size)} · {f.uploadedAt ? new Date(f.uploadedAt).toLocaleString() : ""}
                 </div>
               </div>
-              <a href={f.url} target="_blank" rel="noreferrer"
+              <a href={f.url} target="_blank" rel="noreferrer" download={f.displayName}
                 className="text-xs text-ef-purple hover:underline font-medium">Download</a>
               <button onClick={() => del(f.name)} className="text-xs text-ef-mute hover:text-ef-danger">Delete</button>
             </div>
