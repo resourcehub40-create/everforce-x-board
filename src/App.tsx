@@ -21,7 +21,7 @@ export default function App() {
   return (
     <div className="min-h-screen">
       <Header email={email} view={view} setView={setView} onAdd={() => setAddTrigger((n) => n + 1)} />
-      {view === "board" ? <Board email={email} addTrigger={addTrigger} /> : <Resources />}
+      {view === "board" ? <Board email={email} addTrigger={addTrigger} /> : <Resources email={email} />}
     </div>
   );
 }

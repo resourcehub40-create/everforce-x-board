@@ -18,11 +18,11 @@ export default function Column({
       <div className="flex items-center gap-2 px-1 mb-2">
         <span className="w-2 h-2 rounded-full" style={{ background: accent }} />
         <span className="text-sm font-semibold text-ef-text">{label}</span>
-        <span className="text-xs text-ef-mute">{cards.length}</span>
+        <span className="text-xs text-ef-mute bg-ef-surface2 rounded px-1.5">{cards.length}</span>
       </div>
       <div ref={setNodeRef}
-        className={`bg-ef-panel/60 border rounded-xl p-2 min-h-[60vh] space-y-2 transition ${
-          isOver ? "border-ef-purple" : "border-ef-border"
+        className={`bg-ef-surface2 border rounded-xl p-2 min-h-[60vh] space-y-2 transition ${
+          isOver ? "border-ef-purple bg-ef-purpleBg/40" : "border-ef-borderSoft"
         }`}>
         <SortableContext items={cards.map((c) => c.id)} strategy={verticalListSortingStrategy}>
           {cards.map((c) => (

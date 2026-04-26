@@ -5,18 +5,30 @@ export default {
     extend: {
       colors: {
         ef: {
-          purple: "#6F4FF2",
-          purpleSoft: "#8B73F5",
-          dark: "#14142B",
-          panel: "#1E1E38",
-          panel2: "#262644",
-          border: "#2F2F4A",
-          text: "#EDEDF7",
-          mute: "#9494B8",
+          // Light theme — matches Resource Hub
+          bg: "#FAFAFC",
+          surface: "#FFFFFF",
+          surface2: "#F4F2F9",
+          border: "#E5E2EE",
+          borderSoft: "#EFEDF5",
+          text: "#1A1325",
+          mute: "#6B6379",
+          purple: "#6F2DBD",
+          purpleSoft: "#8B4DD6",
+          purpleBg: "#F2EBFB",
+          purpleLine: "#D8C4F2",
+          // status accents
+          success: "#10996B",
+          warn: "#D97706",
+          danger: "#DC2626",
+          info: "#2563EB",
         },
+      },
+      boxShadow: {
+        soft: "0 1px 2px rgba(26,19,37,0.04), 0 4px 12px rgba(111,45,189,0.06)",
+        lift: "0 8px 28px rgba(111,45,189,0.12)",
       },
     },
   },
   plugins: [],
 }
-

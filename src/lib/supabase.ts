@@ -24,6 +24,7 @@ export interface Card {
   assignees: string[];
   page_url: string | null;
   audit_grade: string | null;
+  section: string | null;
   position: number;
   created_by: string | null;
   created_at: string;
