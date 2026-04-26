@@ -17,9 +17,14 @@ export default function Resources() {
             <div className="space-y-2">
               {RESOURCE_LINKS.filter((l) => l.group === g).map((l) => (
                 <a key={l.url} href={l.url} target="_blank" rel="noreferrer"
-                  className="flex items-center justify-between bg-ef-panel2 border border-ef-border rounded-lg px-3 py-2 hover:border-ef-purple transition">
-                  <span className="text-sm text-ef-text">{l.label}</span>
-                  <span className="text-ef-mute text-xs">↗</span>
+                  className="flex items-center justify-between gap-3 bg-ef-panel2 border border-ef-border rounded-lg px-3 py-2 hover:border-ef-purple transition">
+                  <div className="min-w-0">
+                    <div className="text-sm text-ef-text truncate" style={{ whiteSpace: "pre" }}>{l.label}</div>
+                    {"note" in l && (l as { note?: string }).note && (
+                      <div className="text-[11px] text-ef-mute truncate">{(l as { note?: string }).note}</div>
+                    )}
+                  </div>
+                  <span className="text-ef-mute text-xs flex-shrink-0">↗</span>
                 </a>
               ))}
             </div>
