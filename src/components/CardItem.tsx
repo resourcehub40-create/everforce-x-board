@@ -3,6 +3,18 @@ import { CSS } from "@dnd-kit/utilities";
 import type { Card } from "../lib/supabase";
 import { LABELS, SECTIONS } from "../lib/constants";
 
+function dueTone(d: string | null): { label: string; cls: string } | null {
+  if (!d) return null;
+  const days = Math.ceil((new Date(d + "T23:59:59").getTime() - Date.now()) / 86400000);
+  const cls =
+    days < 0 ? "bg-ef-danger/10 text-ef-danger border-ef-danger/40"
+    : days <= 3 ? "bg-ef-danger/10 text-ef-danger border-ef-danger/40"
+    : days <= 7 ? "bg-ef-warn/10 text-ef-warn border-ef-warn/40"
+    : "bg-ef-purpleBg text-ef-purple border-ef-purpleLine";
+  const label = days < 0 ? `${-days}d overdue` : days === 0 ? "today" : `${days}d`;
+  return { label, cls };
+}
+
 export default function CardItem({ card, onOpen }: { card: Card; onOpen: () => void }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: card.id });
@@ -11,6 +23,7 @@ export default function CardItem({ card, onOpen }: { card: Card; onOpen: () => v
     transition,
     opacity: isDragging ? 0.4 : 1,
   };
+  const due = dueTone(card.due_date);
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners}
       onClick={onOpen}
@@ -34,10 +47,13 @@ export default function CardItem({ card, onOpen }: { card: Card; onOpen: () => v
           })}
         </div>
       )}
-      <div className="flex items-center justify-between text-[11px] text-ef-mute">
-        <div className="truncate">{card.assignees.join(", ") || "Unassigned"}</div>
+      <div className="flex items-center justify-between text-[11px] text-ef-mute gap-2">
+        <div className="truncate flex-1">{card.assignees.join(", ") || "Unassigned"}</div>
+        {due && (
+          <span className={`border rounded px-1.5 py-0.5 font-semibold ${due.cls}`}>{due.label}</span>
+        )}
         {card.audit_grade && (
-          <span className="bg-ef-surface2 border border-ef-border rounded px-1.5 py-0.5 ml-2 text-ef-text font-semibold">{card.audit_grade}</span>
+          <span className="bg-ef-surface2 border border-ef-border rounded px-1.5 py-0.5 text-ef-text font-semibold">{card.audit_grade}</span>
         )}
       </div>
     </div>

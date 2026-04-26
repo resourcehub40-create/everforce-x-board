@@ -25,6 +25,7 @@ export interface Card {
   page_url: string | null;
   audit_grade: string | null;
   section: string | null;
+  due_date: string | null;
   position: number;
   created_by: string | null;
   created_at: string;
@@ -36,5 +37,14 @@ export interface Comment {
   card_id: string;
   author_email: string;
   body: string;
+  created_at: string;
+}
+
+export interface Activity {
+  id: string;
+  card_id: string;
+  actor_email: string;
+  action: string;          // "created" | "moved" | "edited" | "commented" | "deleted"
+  payload: Record<string, unknown>;
   created_at: string;
 }

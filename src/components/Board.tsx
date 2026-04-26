@@ -5,6 +5,7 @@ import {
 } from "@dnd-kit/core";
 import { supabase, type Card, type ColumnKey } from "../lib/supabase";
 import { COLUMNS, LABELS, ASSIGNEES, SECTIONS } from "../lib/constants";
+import { logActivity } from "../lib/activity";
 import Column from "./Column";
 import CardModal from "./CardModal";
 
@@ -20,21 +21,32 @@ export default function Board({ email, addTrigger }: { email: string; addTrigger
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
   async function load() {
-    setLoading(true);
     const { data, error } = await supabase.from("wa_cards").select("*").order("position");
     if (error) console.error(error);
     setCards((data as Card[]) ?? []);
     setLoading(false);
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { void load(); }, []);
+
+  // Realtime — subscribe to wa_cards changes; refetch on any event so order/state stays consistent.
+  useEffect(() => {
+    const channel = supabase
+      .channel("wa_cards_realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "wa_cards" }, () => {
+        void load();
+      })
+      .subscribe();
+    return () => { void supabase.removeChannel(channel); };
+  }, []);
 
   useEffect(() => {
     if (addTrigger > 0) {
       setOpen({
         id: "", title: "", description: "", column_key: "backlog",
         labels: [], assignees: [], page_url: null, audit_grade: null,
-        section: null, position: 0, created_by: email, created_at: "", updated_at: "",
+        section: null, due_date: null,
+        position: 0, created_by: email, created_at: "", updated_at: "",
       });
       setIsNew(true);
     }
@@ -75,14 +87,19 @@ export default function Board({ email, addTrigger }: { email: string; addTrigger
     inTarget.splice(insertIdx, 0, moving);
     const colIdx = COLUMNS.findIndex((x) => x.key === targetCol);
     const repositioned = inTarget.map((c, i) => ({ ...c, position: i + 1 + colIdx * 10000 }));
-    setCards((cs) =>
-      cs.map((c) => repositioned.find((r) => r.id === c.id) ?? c)
-    );
+    setCards((cs) => cs.map((c) => repositioned.find((r) => r.id === c.id) ?? c));
 
     await supabase.from("wa_cards").update({
       column_key: targetCol,
       position: repositioned.find((r) => r.id === aId)?.position ?? card.position,
     }).eq("id", aId);
+
+    if (card.column_key !== targetCol) {
+      await logActivity(card.id, email, "moved", {
+        from: COLUMNS.find((c) => c.key === card.column_key)?.label,
+        to: COLUMNS.find((c) => c.key === targetCol)?.label,
+      });
+    }
   }
 
   const selectCls = "bg-ef-surface border border-ef-border rounded-md text-xs px-2 py-1 text-ef-text outline-none focus:border-ef-purple";

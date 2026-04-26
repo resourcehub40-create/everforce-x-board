@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
-import { supabase, type Card, type Comment, type ColumnKey } from "../lib/supabase";
+import { supabase, type Card, type Comment, type ColumnKey, type Activity } from "../lib/supabase";
 import { ASSIGNEES, COLUMNS, LABELS, SECTIONS } from "../lib/constants";
+import { logActivity, summarize } from "../lib/activity";
+import { postSlack, mentionTag, extractMentions, boardUrl } from "../lib/slack";
 
 interface Props {
   card: Card | null;
@@ -19,15 +21,34 @@ export default function CardModal({ card, isNew, email, onClose, onSaved }: Prop
   const [pageUrl, setPageUrl] = useState(card?.page_url ?? "");
   const [auditGrade, setAuditGrade] = useState(card?.audit_grade ?? "");
   const [section, setSection] = useState<string>(card?.section ?? "");
+  const [dueDate, setDueDate] = useState<string>(card?.due_date ?? "");
   const [comments, setComments] = useState<Comment[]>([]);
+  const [activity, setActivity] = useState<Activity[]>([]);
   const [newComment, setNewComment] = useState("");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (!card || isNew) return;
-    supabase.from("wa_comments").select("*").eq("card_id", card.id).order("created_at")
+    void supabase.from("wa_comments").select("*").eq("card_id", card.id).order("created_at")
       .then(({ data }) => setComments((data as Comment[]) ?? []));
+    void supabase.from("wa_activity").select("*").eq("card_id", card.id).order("created_at", { ascending: false }).limit(50)
+      .then(({ data }) => setActivity((data as Activity[]) ?? []));
   }, [card, isNew]);
+
+  function changedFields(): string[] {
+    if (!card) return [];
+    const f: string[] = [];
+    if (card.title !== title.trim()) f.push("title");
+    if ((card.description ?? "") !== description) f.push("description");
+    if (card.column_key !== columnKey) f.push("column");
+    if (JSON.stringify(card.labels) !== JSON.stringify(labels)) f.push("labels");
+    if (JSON.stringify(card.assignees) !== JSON.stringify(assignees)) f.push("assignees");
+    if ((card.page_url ?? "") !== pageUrl) f.push("page_url");
+    if ((card.audit_grade ?? "") !== auditGrade) f.push("audit_grade");
+    if ((card.section ?? "") !== section) f.push("section");
+    if ((card.due_date ?? "") !== dueDate) f.push("due_date");
+    return f;
+  }
 
   async function save() {
     if (!title.trim()) return;
@@ -41,11 +62,25 @@ export default function CardModal({ card, isNew, email, onClose, onSaved }: Prop
       page_url: pageUrl || null,
       audit_grade: auditGrade || null,
       section: section || null,
+      due_date: dueDate || null,
     };
     if (isNew) {
-      await supabase.from("wa_cards").insert({ ...payload, created_by: email });
+      const { data } = await supabase.from("wa_cards").insert({ ...payload, created_by: email }).select().single();
+      const newId = (data as Card | null)?.id;
+      if (newId) {
+        await logActivity(newId, email, "created", { title: payload.title, section: payload.section });
+        const mentions = assignees.map(mentionTag).join(" ");
+        const sectionLabel = section ? (SECTIONS.find((s) => s.key === section)?.label ?? section) : "";
+        const due = dueDate ? ` · due ${dueDate}` : "";
+        const url = `${boardUrl()}/?card=${newId}`;
+        void postSlack(
+          `🆕 *${payload.title}* ${sectionLabel ? `_(${sectionLabel})_` : ""}${due}\n${mentions ? `Assigned: ${mentions}\n` : ""}${url}`
+        );
+      }
     } else if (card) {
+      const fields = changedFields();
       await supabase.from("wa_cards").update(payload).eq("id", card.id);
+      if (fields.length > 0) await logActivity(card.id, email, "edited", { fields });
     }
     setBusy(false);
     onSaved();
@@ -55,6 +90,7 @@ export default function CardModal({ card, isNew, email, onClose, onSaved }: Prop
   async function del() {
     if (!card || isNew) return;
     if (!confirm("Delete this card?")) return;
+    await logActivity(card.id, email, "deleted", { title: card.title });
     await supabase.from("wa_cards").delete().eq("id", card.id);
     onSaved();
     onClose();
@@ -62,11 +98,20 @@ export default function CardModal({ card, isNew, email, onClose, onSaved }: Prop
 
   async function addComment() {
     if (!card || !newComment.trim()) return;
+    const body = newComment.trim();
     const { data } = await supabase.from("wa_comments")
-      .insert({ card_id: card.id, author_email: email, body: newComment.trim() })
+      .insert({ card_id: card.id, author_email: email, body })
       .select().single();
     if (data) setComments((c) => [...c, data as Comment]);
     setNewComment("");
+    await logActivity(card.id, email, "commented", { excerpt: body.slice(0, 120) });
+
+    const mentioned = extractMentions(body, ASSIGNEES);
+    if (mentioned.length > 0) {
+      const tags = mentioned.map(mentionTag).join(" ");
+      const url = `${boardUrl()}/?card=${card.id}`;
+      void postSlack(`💬 ${tags} mentioned by *${email}* on *${card.title}*\n> ${body.slice(0, 280)}\n${url}`);
+    }
   }
 
   function toggle<T>(arr: T[], v: T): T[] {
@@ -93,21 +138,23 @@ export default function CardModal({ card, isNew, email, onClose, onSaved }: Prop
               <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={5}
                 className={inputCls} />
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="col-span-2">
                 <label className="block text-xs text-ef-mute mb-1 font-medium">Page URL</label>
                 <input value={pageUrl} onChange={(e) => setPageUrl(e.target.value)} className={inputCls + " text-sm"} />
               </div>
               <div>
                 <label className="block text-xs text-ef-mute mb-1 font-medium">Audit grade</label>
-                <input value={auditGrade} onChange={(e) => setAuditGrade(e.target.value)} placeholder="A / B / C+ / D / F"
+                <input value={auditGrade} onChange={(e) => setAuditGrade(e.target.value)} placeholder="A / B / C+"
                   className={inputCls + " text-sm"} />
               </div>
             </div>
 
             {!isNew && card && (
               <div className="pt-4 border-t border-ef-border">
-                <div className="text-xs text-ef-mute uppercase tracking-wide mb-2 font-semibold">Comments</div>
+                <div className="text-xs text-ef-mute uppercase tracking-wide mb-2 font-semibold">
+                  Comments <span className="text-ef-mute font-normal">(use @Name to ping)</span>
+                </div>
                 <div className="space-y-2 mb-3 max-h-48 overflow-y-auto">
                   {comments.map((c) => (
                     <div key={c.id} className="bg-ef-surface2 border border-ef-borderSoft rounded-lg px-3 py-2">
@@ -122,7 +169,7 @@ export default function CardModal({ card, isNew, email, onClose, onSaved }: Prop
                 <div className="flex gap-2">
                   <input value={newComment} onChange={(e) => setNewComment(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && addComment()}
-                    placeholder="Add a comment…"
+                    placeholder="Add a comment… (try @Jordan)"
                     className={inputCls + " text-sm"} />
                   <button onClick={addComment} className="bg-ef-purple hover:bg-ef-purpleSoft text-white text-sm font-medium rounded-lg px-4">Send</button>
                 </div>
@@ -137,6 +184,11 @@ export default function CardModal({ card, isNew, email, onClose, onSaved }: Prop
                 className={inputCls + " text-sm"}>
                 {COLUMNS.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
               </select>
+            </div>
+            <div>
+              <label className="block text-xs text-ef-mute mb-1 font-medium">Due date</label>
+              <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)}
+                className={inputCls + " text-sm"} />
             </div>
             <div>
               <label className="block text-xs text-ef-mute mb-1 font-medium">
@@ -187,6 +239,20 @@ export default function CardModal({ card, isNew, email, onClose, onSaved }: Prop
                 })}
               </div>
             </div>
+            {!isNew && activity.length > 0 && (
+              <div>
+                <div className="text-xs text-ef-mute mb-1 font-medium uppercase tracking-wide">Activity</div>
+                <div className="space-y-1.5 max-h-60 overflow-y-auto pr-1">
+                  {activity.map((a) => (
+                    <div key={a.id} className="text-[11px] text-ef-mute leading-snug border-l-2 border-ef-purpleLine pl-2">
+                      <span className="text-ef-text font-medium">{a.actor_email.split("@")[0]}</span>{" "}
+                      {summarize(a.action, a.payload)}
+                      <div className="text-ef-mute/80">{new Date(a.created_at).toLocaleString()}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
