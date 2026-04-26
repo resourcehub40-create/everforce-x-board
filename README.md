@@ -1,73 +1,48 @@
-# React + TypeScript + Vite
+# EverForce X — Task Force Board
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Internal kanban for the everflow.io website refresh task force (Apr–Jun 2026).
 
-Currently, two official plugins are available:
+**Live:** https://everforce-x-board.web.app (will move to `board.everflow-resource-hub.com`)
+**Repo:** `resourcehub40-create/everforce-x-board`
+**Task force:** Jordan, Dasha, Ceno, François, Brent, Tony, Frank
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Auth
 
-## React Compiler
+Single shared password + `*@everflow.io` email gate. Password lives in `VITE_BOARD_PASSWORD` (currently `everforce-x-2026`). Rotate by updating `.env.local`, rebuilding, and redeploying.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Stack
 
-## Expanding the ESLint configuration
+- Vite + React + TypeScript + Tailwind
+- `@dnd-kit` for drag-drop
+- Supabase (Resource Hub instance `ywtsgnjvhykkjnrzmjtg`) — tables `wa_cards`, `wa_comments`
+- Firebase Hosting on `neural-engine-493901-h8`, site `everforce-x-board`
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Local dev
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
+npm run dev      # http://localhost:5173
+npm run build    # produces dist/
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+`.env.local` (gitignored) holds Supabase keys + board password. See `.env.example`.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Deploy
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm run build
+firebase deploy --only hosting --project neural-engine-493901-h8
 ```
+
+## Schema
+
+`supabase/migrations/0001_init.sql` — applied via Supabase Mgmt API. Re-runnable (uses `if not exists`).
+
+## v1 follow-ups
+
+- File uploads to Supabase Storage bucket `everforce-x-files` (Resources tab)
+- Activity log (who moved/edited what)
+- Audit-tool integration — pull live grades from `ef-website-audit.web.app` per card
+- Realtime sync via Supabase channels
+- Custom domain wired to `board.everflow-resource-hub.com`
+- Card seeding from KICKOFF_NOTES (12 critical fixes + Red/Yellow page tiers)
